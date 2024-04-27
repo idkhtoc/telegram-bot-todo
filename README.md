@@ -1,5 +1,7 @@
 # Telegram Bot ToDo
 
+<img src="PREVIEW.png" alt="Preview image" width="300"/>
+
 ## Overview
 
 A simple telegram bot for planning and making to-do lists running on python with aiogram library.
