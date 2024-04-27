@@ -2,95 +2,105 @@ import asyncio
 from datetime import datetime
 import logging
 import json
+import sys
 from pymongo import MongoClient
-from aiogram import Bot, types, Dispatcher, executor, filters
-from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from aiogram.dispatcher import FSMContext
-from aiogram.dispatcher.filters.state import State, StatesGroup
+from aiogram import Bot, types, Dispatcher, filters, F, Router
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.context import FSMContext
+
 
 from modules.task import Task
 from modules.tasks_send import TasksSend
 from modules.task_buttons import TaskButtons
-from modules.registration import Register
+from modules.registration import Registration
 from modules.states import States
+from modules.keyboards import main_keyboard
 
-with open('C:\Programming\Python\TelegramBotToDoList\CONFIG.json', 'r') as json_file:
-    token = json.load(json_file)['API_TOKEN']
+import constants as constants
 
-logging.basicConfig(level=logging.INFO)
-myBot = Bot(token=token)
-dp = Dispatcher(myBot, storage=MemoryStorage())
+with open('./CONFIG.json', 'r') as json_file:
+    config = json.load(json_file)
 
-client = MongoClient()
-start_texts = client['Texts']['StartTexts']
+    token = config['API_TOKEN']
+    client = MongoClient(config['DB_URL'])
+    db = client[config['DB_NAME']]
 
-markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-markup.row('Добавить задание').row('Все задания', 'Все задания за дату:')
+router = Router()
+myBot = Bot(token)
 
+markup = main_keyboard()
 
-@dp.message_handler(commands=['start', 'help'])
+task_buttons = TaskButtons(db.tasks)
+registration = Registration(db.users)
+states = States()
+task = Task(db.tasks)
+tasks_send = TasksSend(db.tasks)
+
+@router.message(filters.Command(commands=['start', 'help']))
 async def command(message: types.Message):
     if message.text == '/start':
-        await Register(message.from_user).add()
+        await registration.add(message.from_user.id, message.from_user.username)
 
-        start_text = start_texts.find_one({'type': 'start'})['text']
-
-        await message.answer(start_text, reply_markup=markup)
+        await message.answer(constants.START_TEXT, reply_markup=markup)
 
 
-@dp.message_handler(filters.Text(equals=['Добавить задание', 'Все задания', 'Все задания за дату:']))
-async def add_new_task(message: types.Message):
-    if message.text == 'Добавить задание':
-        add_text = start_texts.find_one({'type': 'addTask'})['text']
+@router.message(F.text.in_(constants.TASKS_TEXTS))
+async def add_new_task(message: types.Message, state: FSMContext):
+    if message.text == constants.ADD_TASK_TEXT:
+        await message.answer(constants.ADD_TEXT, reply_markup=types.ReplyKeyboardRemove())
 
-        await message.answer(add_text, reply_markup=types.ReplyKeyboardRemove())
+        await state.set_state(states.new_task_state)
 
-        await States.new_task_state.set()
+    elif message.text == constants.ALL_TASKS_TEXT:
+        await tasks_send.send(message, str(message.date.date()))
 
-    elif message.text == 'Все задания':
-        await TasksSend(message.from_user).send(message, datetime.now().date())
+    elif message.text == constants.ALL_TASKS_TEXT_DATE:
+        await message.answer(constants.DATE_TASKS_TEXT, reply_markup=types.ReplyKeyboardRemove())
 
-    elif message.text == 'Все задания за дату:':
-        date_text = start_texts.find_one({'type': 'dateTasks'})['text']
-
-        await message.answer(date_text, reply_markup=types.ReplyKeyboardRemove())
-
-        await States.time_state.set()
+        await state.set_state(states.time_state)
 
 
-@dp.message_handler(content_types=['text'], state=States.new_task_state)
+@router.message(F.text and states.new_task_state)
 async def task_text(message: types.Message, state: FSMContext):
-    await state.finish()
+    await state.clear()
 
     if message.text:
-        task = await Task(message.text, message.from_user).add_task()
+        answer = constants.ADD_BADLY_TEXT
 
-        if task:
-            text = start_texts.find_one({'type': 'addSuccessfully'})['text']
-        else:
-            text = start_texts.find_one({'type': 'addBadly'})['text']
+        if await task.add_task(message.from_user.id, message.text, str(message.date.date())):
+            answer = constants.ADD_SUCCESSFULY_TEXT
 
-        await message.answer(text, reply_markup=markup)
+        await message.answer(answer, reply_markup=markup)
 
 
-@dp.message_handler(content_types=['text'], state=States.time_state)
+@router.message(F.text and states.time_state)
 async def date_text(message: types.Message, state: FSMContext):
-    await state.finish()
+    await state.clear()
 
     try:
         date = datetime.strptime(message.text, '%d.%m.%Y').date()
-        await TasksSend(message.from_user).send(message, date)
+        await tasks_send.send(message, str(date))
     except:
-        await message.answer('Вы неправильно ввели дату(', reply_markup=markup)
+        await message.answer(constants.FALSE_DATE_TEXT, reply_markup=markup)
 
 
-@dp.callback_query_handler(lambda call: True)
-async def task_buttons(call):
+@router.callback_query(F.data)
+async def task_buttons_handler(call):
     if call.data == 'delete':
-        await TaskButtons(call).delete()
+        if await task_buttons.delete(call.from_user.id, call.message.text, str(call.message.date.date())):
+            await call.message.delete()
 
     elif call.data == 'done':
-        await TaskButtons(call).done(myBot)
+        text, markup = await task_buttons.done(call.from_user.id, call.message.text, str(call.message.date.date()))
+
+        await myBot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+
+async def main():
+    dp = Dispatcher(storage=MemoryStorage())
+    dp.include_router(router)
+
+    await dp.start_polling(myBot)
 
 if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=True)
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+    asyncio.run(main())

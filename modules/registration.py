@@ -1,14 +1,8 @@
-import asyncio
-from pymongo import MongoClient
+class Registration:
+    def __init__(self, users):
+        self.users = users
 
-client = MongoClient()
-users = client['Users']
+    async def add(self, user_id, user_name):
 
-
-class Register:
-    def __init__(self, user):
-        self.user_id = user.id
-
-    async def add(self):
-        if not str(self.user_id) in users.list_collection_names():
-            await users.create_collection(str(self.user_id))
+        if not self.users.find_one({'_id': str(user_id)}):
+            self.users.insert_one({'_id': str(user_id), 'name': user_name })

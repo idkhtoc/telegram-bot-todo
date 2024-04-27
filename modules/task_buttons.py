@@ -1,33 +1,31 @@
-import asyncio
-from pymongo import MongoClient
 from datetime import datetime
-from aiogram import types
 
-client = MongoClient()
-users = client['Users']
-
+from modules.keyboards import task_inline_keyboard
 
 class TaskButtons:
-    def __init__(self, call):
-        self.user = users[str(call.from_user.id)]
-        self.message = call.message
-        self.text = call.message.text[16:]
+    def __init__(self, tasks):
+        self.tasks = tasks;
 
-    async def delete(self):
-        self.user.find_one_and_delete({'text': self.text, 'date': str(datetime.now().date())})
-        await self.message.delete()
+    async def delete(self, user_id, text, date):
+        successful = self.tasks.find_one_and_delete({'user': user_id, 'text': text[16:], 'date': date})
 
-    async def done(self, bot):
-        task = self.user.find_one({'text': self.text, 'date': str(datetime.now().date())})
-        self.user.find_one_and_update({'text': self.text, 'date': str(datetime.now().date())},
+        return bool(successful)
+
+    async def done(self, user_id, message_text, date):
+        task_text = message_text.replace('✅', '').replace('❌', '').strip()
+
+        task = self.tasks.find_one({'user': user_id, 'text': task_text, 'date': date})
+        
+        self.tasks.find_one_and_update({'user': user_id, 'text': task_text, 'date': date},
                                       {'$set': {'done': not task['done']}})
+        
+        text = ''
+
         if task['done']:
-            text = self.message.text.replace('✅', '❌')
+            text = message_text.replace('✅', '❌')
         else:
-            text = self.message.text.replace('❌', '✅')
+            text = message_text.replace('❌', '✅')
 
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton('Изменить', callback_data='done')) \
-              .add(types.InlineKeyboardButton('Удалить', callback_data='delete'))
+        markup = task_inline_keyboard()
 
-        await bot.edit_message_text(text, self.message.chat.id, self.message.message_id, reply_markup=markup)
+        return text, markup

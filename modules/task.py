@@ -1,21 +1,15 @@
-import asyncio
 from datetime import datetime
-from pymongo import MongoClient
-
-client = MongoClient()
-users = client['Users']
-
 
 class Task:
-    def __init__(self, text, user):
-        self.task_text = text
-        self.user = users[str(user.id)]
+    def __init__(self, tasks):
+        self.tasks = tasks
 
-    async def add_task(self):
-        if not self.user.find_one({'text': self.task_text, 'date': str(datetime.now().date())}):
-            self.user.insert_one({
-                'text': self.task_text,
-                'date': str(datetime.now().date()),
+    async def add_task(self, user_id, task_text, date):
+        if not self.tasks.find_one({'user': user_id, 'text': task_text, 'date': date}):
+            self.tasks.insert_one({
+                'user': user_id,
+                'text': task_text,
+                'date': date,
                 'done': False
             })
 

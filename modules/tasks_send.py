@@ -1,37 +1,31 @@
-import asyncio
 from datetime import datetime
-from pymongo import MongoClient
-from aiogram import types
 
-client = MongoClient()
-users = client['Users']
-
+from modules.keyboards import main_keyboard, task_inline_keyboard
+import constants
 
 class TasksSend:
-    def __init__(self, user):
-        self.user = users[str(user.id)]
+    def __init__(self, tasks):
+        self.tasks = tasks
 
     async def send(self, message, date):
-        tasks = list(self.user.find({'date': str(date)}))
-        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        markup.row('Добавить задание').row('Все задания', 'Все задания за дату:')
+        tasks = list(self.tasks.find({'user': message.from_user.id, 'date': date}))
+
+        markup = main_keyboard()
 
         if tasks:
-            text = f'Все задания на {date}'
+            text = constants.ALL_TASKS_TEXT_DATE + ' ' + date
 
             await message.answer(text, reply_markup=markup)
 
             for i, el in enumerate(tasks):
-                text = f'{"✅"*14 if el["done"] else "❌"*14}\n\n{el["text"]}'
+                task_text = f'{"✅"*14 if el["done"] else "❌"*14}\n\n{el["text"]}'
 
-                if date == datetime.now().date():
-                    markup = types.InlineKeyboardMarkup()
-                    markup.add(types.InlineKeyboardButton('Изменить', callback_data='done')) \
-                          .add(types.InlineKeyboardButton('Удалить', callback_data='delete'))
+                if date == str(message.date.date()):
+                    markup = task_inline_keyboard()
 
-                    await message.answer(text, reply_markup=markup)
+                    await message.answer(task_text, reply_markup=markup)
                 else:
-                    await message.answer(text)
+                    await message.answer(task_text)
 
         else:
             await message.answer('Заданий нет(', reply_markup=markup)
