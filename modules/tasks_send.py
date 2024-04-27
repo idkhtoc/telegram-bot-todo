@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from modules.keyboards import main_keyboard, task_inline_keyboard
 import constants
 
@@ -13,7 +11,7 @@ class TasksSend:
         markup = main_keyboard()
 
         if tasks:
-            text = constants.ALL_TASKS_TEXT_DATE + ' ' + date
+            text = constants.ALL_NOTES_TEXT_DATE + ' ' + date
 
             await message.answer(text, reply_markup=markup)
 
@@ -28,4 +26,4 @@ class TasksSend:
                     await message.answer(task_text)
 
         else:
-            await message.answer('Заданий нет(', reply_markup=markup)
+            await message.answer(constants.NO_NOTES, reply_markup=markup)

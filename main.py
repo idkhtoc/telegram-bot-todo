@@ -44,18 +44,18 @@ async def command(message: types.Message):
         await message.answer(constants.START_TEXT, reply_markup=markup)
 
 
-@router.message(F.text.in_(constants.TASKS_TEXTS))
+@router.message(F.text.in_(constants.NOTES_TEXTS))
 async def add_new_task(message: types.Message, state: FSMContext):
     if message.text == constants.ADD_TASK_TEXT:
         await message.answer(constants.ADD_TEXT, reply_markup=types.ReplyKeyboardRemove())
 
         await state.set_state(states.new_task_state)
 
-    elif message.text == constants.ALL_TASKS_TEXT:
+    elif message.text == constants.ALL_NOTES_TEXT:
         await tasks_send.send(message, str(message.date.date()))
 
-    elif message.text == constants.ALL_TASKS_TEXT_DATE:
-        await message.answer(constants.DATE_TASKS_TEXT, reply_markup=types.ReplyKeyboardRemove())
+    elif message.text == constants.ALL_NOTES_TEXT_DATE:
+        await message.answer(constants.DATE_NOTES_TEXT, reply_markup=types.ReplyKeyboardRemove())
 
         await state.set_state(states.time_state)
 

@@ -5,7 +5,7 @@ import constants
 def main_keyboard():
     return ReplyKeyboardMarkup(resize_keyboard=True, keyboard=[
         [KeyboardButton(text=constants.ADD_TASK_TEXT)],
-        [KeyboardButton(text=constants.ALL_TASKS_TEXT), KeyboardButton(text=constants.ALL_TASKS_TEXT_DATE)]
+        [KeyboardButton(text=constants.ALL_NOTES_TEXT), KeyboardButton(text=constants.ALL_NOTES_TEXT_DATE)]
     ])
 
 def task_inline_keyboard():
